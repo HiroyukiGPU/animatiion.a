@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>TPS風Blenderアニメーション</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #fff; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    let model, mixer;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+    // ライトを強めに
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 10, 7.5);
+    scene.add(dirLight);
+
+    // カメラ初期位置
+    camera.position.set(0, 2, 5);
+    controls.target.set(0, 1, 0);
+    controls.update();
+
+    // モデル読み込み
+    const loader = new THREE.GLTFLoader();
+    loader.load('model.glb', function (gltf) {
+      model = gltf.scene;
+      scene.add(model);
+
+      mixer = new THREE.AnimationMixer(model);
+      gltf.animations.forEach((clip) => {
+        mixer.clipAction(clip).play();
+      });
+
+      animate();
+    });
+
+    // 移動制御
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      if (mixer) mixer.update(delta);
+      if (model) {
+        const moveSpeed = 2 * delta;
+        if (keys.w) model.position.z -= moveSpeed;
+        if (keys.s) model.position.z += moveSpeed;
+        if (keys.a) model.position.x -= moveSpeed;
+        if (keys.d) model.position.x += moveSpeed;
+
+        // カメラをモデルに追従
+        const camOffset = new THREE.Vector3(0, 2, 5);
+        const modelPos = model.position.clone();
+        camera.position.copy(modelPos.clone().add(camOffset));
+        camera.lookAt(modelPos);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
