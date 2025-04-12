@@ -2,14 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>TPS風Blenderアニメーション</title>
+  <title>TPS風キャラクター操作</title>
   <style>
     body { margin: 0; overflow: hidden; background: #fff; }
     canvas { display: block; }
   </style>
 </head>
 <body>
-  <!-- ライブラリ -->
+  <!-- Three.js & 拡張 -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -24,15 +24,18 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // OrbitControlsをセット
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
 
-    // ライトを強めに
+    // ライト
     scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1);
     dirLight.position.set(5, 10, 7.5);
     scene.add(dirLight);
 
-    // カメラ初期位置
+    // 初期カメラ位置
     camera.position.set(0, 2, 5);
     controls.target.set(0, 1, 0);
     controls.update();
@@ -41,6 +44,7 @@
     const loader = new THREE.GLTFLoader();
     loader.load('SUI.glb', function (gltf) {
       model = gltf.scene;
+      model.position.set(0, 0, 0);
       scene.add(model);
 
       mixer = new THREE.AnimationMixer(model);
@@ -49,9 +53,11 @@
       });
 
       animate();
+    }, undefined, function (error) {
+      console.error("❌ モデル読み込みエラー:", error);
     });
 
-    // 移動制御
+    // キー入力処理
     const keys = {};
     window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
     window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
@@ -59,23 +65,29 @@
     const clock = new THREE.Clock();
     function animate() {
       requestAnimationFrame(animate);
-      const delta = clock.getDelta();
 
+      const delta = clock.getDelta();
       if (mixer) mixer.update(delta);
+
       if (model) {
         const moveSpeed = 2 * delta;
-        if (keys.w) model.position.z -= moveSpeed;
-        if (keys.s) model.position.z += moveSpeed;
-        if (keys.a) model.position.x -= moveSpeed;
-        if (keys.d) model.position.x += moveSpeed;
+        let moved = false;
 
-        // カメラをモデルに追従
-        const camOffset = new THREE.Vector3(0, 2, 5);
-        const modelPos = model.position.clone();
-        camera.position.copy(modelPos.clone().add(camOffset));
-        camera.lookAt(modelPos);
+        if (keys.w) { model.position.z -= moveSpeed; moved = true; }
+        if (keys.s) { model.position.z += moveSpeed; moved = true; }
+        if (keys.a) { model.position.x -= moveSpeed; moved = true; }
+        if (keys.d) { model.position.x += moveSpeed; moved = true; }
+
+        if (moved) {
+          // カメラをモデルに追従させる
+          const offset = new THREE.Vector3(0, 2, 5);
+          const camPos = model.position.clone().add(offset);
+          camera.position.lerp(camPos, 0.1);
+          controls.target.copy(model.position);
+        }
       }
 
+      controls.update();
       renderer.render(scene, camera);
     }
 
